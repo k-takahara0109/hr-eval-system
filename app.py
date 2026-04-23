@@ -885,6 +885,107 @@ with t_upload:
                 st.error(f"❌ {f.name} の読み込みエラー: {e}")
 
     st.divider()
+
+    # ══════════════════════════════════════════════════════════════
+    # 📝 表記統一（一括リネーム）
+    # ══════════════════════════════════════════════════════════════
+    if st.session_state.skill_members:
+        st.subheader("📝 表記統一（一括リネーム）")
+        st.caption(
+            "同じ意味の部署名・職種名がバラバラに記載されている場合、"
+            "一括で統一表記に変換できます。"
+            "個別に変えたい場合は下の一覧の各メンバーから編集してください。"
+        )
+
+        # 現在登録されている部署・職種の一覧を集計
+        dept_counts: dict = {}
+        job_counts:  dict = {}
+        for nm, d in st.session_state.skill_members.items():
+            dept = d.get("department", "") or "（未設定）"
+            job  = d.get("job_type_label", "") or "（未設定）"
+            dept_counts[dept] = dept_counts.get(dept, 0) + 1
+            job_counts[job]   = job_counts.get(job, 0) + 1
+
+        rc1, rc2 = st.columns(2)
+
+        with rc1:
+            st.markdown("**🏢 部署名**")
+            if len(dept_counts) <= 1:
+                st.caption("部署名のバリエーションはありません。")
+            else:
+                dept_options = [f"{k} ({v}名)" for k, v in dept_counts.items()]
+                dept_keys    = list(dept_counts.keys())
+                sel_dept_idx = st.selectbox(
+                    "変換元の部署名",
+                    options=range(len(dept_options)),
+                    format_func=lambda i: dept_options[i],
+                    key="rename_dept_src_idx",
+                )
+                new_dept = st.text_input(
+                    "変換後の部署名",
+                    key="rename_dept_dst",
+                    placeholder="例: TSU",
+                )
+                if st.button("🔄 部署名を一括変換", key="btn_rename_dept", use_container_width=True):
+                    src = dept_keys[sel_dept_idx]
+                    dst = new_dept.strip()
+                    if not dst:
+                        st.warning("変換後の部署名を入力してください。")
+                    elif src == "（未設定）":
+                        affected = [nm for nm, d in st.session_state.skill_members.items()
+                                    if not (d.get("department") or "")]
+                        for nm in affected:
+                            st.session_state.skill_members[nm]["department"] = dst
+                        st.success(f"✅ {len(affected)}名の部署名を「{dst}」に設定しました。")
+                        st.rerun()
+                    else:
+                        affected = [nm for nm, d in st.session_state.skill_members.items()
+                                    if d.get("department") == src]
+                        for nm in affected:
+                            st.session_state.skill_members[nm]["department"] = dst
+                        st.success(f"✅ {len(affected)}名の部署名を「{src}」→「{dst}」に変換しました。")
+                        st.rerun()
+
+        with rc2:
+            st.markdown("**🏷️ 職種名**")
+            if len(job_counts) <= 1:
+                st.caption("職種名のバリエーションはありません。")
+            else:
+                job_options = [f"{k} ({v}名)" for k, v in job_counts.items()]
+                job_keys    = list(job_counts.keys())
+                sel_job_idx = st.selectbox(
+                    "変換元の職種名",
+                    options=range(len(job_options)),
+                    format_func=lambda i: job_options[i],
+                    key="rename_job_src_idx",
+                )
+                new_job = st.text_input(
+                    "変換後の職種名",
+                    key="rename_job_dst",
+                    placeholder="例: Pro Dir",
+                )
+                if st.button("🔄 職種名を一括変換", key="btn_rename_job", use_container_width=True):
+                    src = job_keys[sel_job_idx]
+                    dst = new_job.strip()
+                    if not dst:
+                        st.warning("変換後の職種名を入力してください。")
+                    elif src == "（未設定）":
+                        affected = [nm for nm, d in st.session_state.skill_members.items()
+                                    if not (d.get("job_type_label") or "")]
+                        for nm in affected:
+                            st.session_state.skill_members[nm]["job_type_label"] = dst
+                        st.success(f"✅ {len(affected)}名の職種名を「{dst}」に設定しました。")
+                        st.rerun()
+                    else:
+                        affected = [nm for nm, d in st.session_state.skill_members.items()
+                                    if d.get("job_type_label") == src]
+                        for nm in affected:
+                            st.session_state.skill_members[nm]["job_type_label"] = dst
+                        st.success(f"✅ {len(affected)}名の職種名を「{src}」→「{dst}」に変換しました。")
+                        st.rerun()
+
+        st.divider()
+
     c1, c2 = st.columns(2)
 
     with c1:
@@ -893,9 +994,17 @@ with t_upload:
             st.caption("未登録")
         for nm, d in list(st.session_state.skill_members.items()):
             with st.expander(
-                f"**{nm}** ｜ {d['job_type_label']} ｜ {d['grade']} ｜ {d['total']}点",
+                f"**{nm}** ｜ {d.get('department','') or '（未設定）'} ｜ {d['job_type_label']} ｜ {d['grade']} ｜ {d['total']}点",
                 expanded=False,
             ):
+                new_dept = st.text_input(
+                    "部署名（部署タブ切り替え用）",
+                    value=d.get("department", "") or "",
+                    key=f"dept_s_{nm}",
+                    placeholder="例: TSU",
+                )
+                d["department"] = new_dept
+
                 new_label = st.text_input(
                     "職種名（タブ切り替え用）",
                     value=d["job_type_label"],
